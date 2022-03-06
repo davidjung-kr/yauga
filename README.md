@@ -13,6 +13,14 @@ Yet another Upbit API for golang
 Check out `dependencies.sh`.
 
 # Test
-```
-go test ./
+`go test ./` or `go test ./ -v`
+# Example
+## 전체계좌 조회
+* [Upbit API document @ /v1/accounts](https://docs.upbit.com/reference/%EC%A0%84%EC%B2%B4-%EA%B3%84%EC%A2%8C-%EC%A1%B0%ED%9A%8C)
+```.go
+upbit := NewUpbit(accessKey, uuid.NewString())
+upbit.Payload(secretKey)
+raw := upbit.Accounts()
+fmt.Print(raw.Response[0].Currency) // Result: KRW (통화코드)
+fmt.Print(raw.Response[0].Balance) // Result: <Numberic> (잔액)
 ```
