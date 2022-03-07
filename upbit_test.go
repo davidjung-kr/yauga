@@ -9,8 +9,6 @@ package main
 import (
 	"os"
 	"testing"
-
-	"github.com/google/uuid"
 )
 
 // 환경변수 상에서 엑세스 데이터 취득
@@ -29,9 +27,9 @@ func TestUpbitNew(t *testing.T) {
 		t.Errorf("OMNIC_SECRECT_KEY 키 비어있음")
 	}
 
-	upbit := NewUpbit(accessKey, uuid.NewString())
+	upbit := NewUpbit(accessKey)
 
-	token, payloadErr := upbit.Payload(secretKey)
+	token, payloadErr := upbit.Payload(secretKey, "")
 	if token == "" || payloadErr != nil {
 		t.Errorf("TestUpbitNew | token:[%s], payloadErr:[%s]", token, payloadErr)
 	}
@@ -40,9 +38,10 @@ func TestUpbitNew(t *testing.T) {
 // Account 테스트
 func TestUpbitAccount(t *testing.T) {
 	accessKey, secretKey := getEnvData()
-	upbit := NewUpbit(accessKey, uuid.NewString())
-	upbit.Payload(secretKey)
+	upbit := NewUpbit(accessKey)
+	upbit.Payload(secretKey, "")
 	x := upbit.Accounts()
+	t.Log(x.Response[0].Balance)
 	if x.Common.StatusCode != 200 || x.Common.Error != nil || len(x.Response) <= 0 {
 		t.Errorf("TestUpbitAccount | Status:[%d], accountsErr:[%s]", x.Common.StatusCode, x.Common.Error)
 	}
@@ -51,10 +50,10 @@ func TestUpbitAccount(t *testing.T) {
 // CandlesDays 테스트
 func TestUpbitCandlesDays(t *testing.T) {
 	accessKey, _ := getEnvData()
-	upbit := NewUpbit(accessKey, uuid.NewString())
+	upbit := NewUpbit(accessKey)
 	x := upbit.CandlesDays("KRW-BTC", "", 1, "KRW")
 	t.Log(x.Response)
 	if x.Common.StatusCode != 200 || x.Common.Error != nil {
-		t.Errorf("TestUpbitCandlesDays | Status:[%d], accountsErr:[%s]", x.Common.StatusCode, x.Common.Error)
+		t.Errorf("TestUpbitCandlesDays | Status:[%d], candlesDaysErr:[%s]", x.Common.StatusCode, x.Common.Error)
 	}
 }

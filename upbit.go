@@ -30,8 +30,8 @@ type Upbit struct {
 }
 
 // Initialization
-func NewUpbit(AccessKey string, Nonce string) *Upbit {
-	return &Upbit{AccessKey: AccessKey, Nonce: Nonce}
+func NewUpbit(AccessKey string) *Upbit {
+	return &Upbit{AccessKey: AccessKey}
 }
 
 // 인증 가능한 요청 만들기
@@ -39,10 +39,15 @@ func NewUpbit(AccessKey string, Nonce string) *Upbit {
 //  페이로드의 구성은 다음과 같습니다.
 // Params:
 //	secertKey = That issued by the Upbit developer center
-func (o *Upbit) Payload(secertKey string) (string, error) {
+//	nonce = Random uuid string. 따로 지정 안하면 google/uuid에서 생성한 값을 사용함
+func (o *Upbit) Payload(secertKey string, nonce string) (string, error) {
 	claim := jwt.MapClaims{}
 	claim["access_key"] = o.AccessKey
-	claim["nonce"] = uuid.New()
+	if nonce == "" {
+		claim["nonce"] = uuid.New()
+	} else {
+		claim["nonce"] = nonce
+	}
 	at := jwt.NewWithClaims(jwt.SigningMethodHS256, claim)
 
 	token, err := at.SignedString([]byte(secertKey))
