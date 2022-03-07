@@ -23,6 +23,8 @@ const (
 	UPBIT_URL_ACCOUNTS = "https://api.upbit.com/v1/accounts"
 	// [Quotation API] 일(Day) 캔들(Days candles inquiry)
 	UPBIT_URL_CANDLES_DAYS = "https://api.upbit.com/v1/candles/days"
+	// [Quotation API] 마켓 코드 조회(Market code inquiry)
+	UPBIT_URL_MARKET_ALL = "https://api.upbit.com/v1/market/all"
 )
 
 type Upbit struct {
@@ -90,6 +92,59 @@ func (o *Upbit) Accounts() UpbitAccounts {
 	var blocks []UpbitAccountBlock
 	json.Unmarshal([]byte(content), &blocks)
 	res.Common.StatusCode = httpRes.StatusCode
+	res.Response = blocks
+	return res
+}
+
+// [Quotation API] 마켓 코드 조회 @ market/all
+//  업비트에서 거래 가능한 마켓 목록
+// Params:
+// 	isDetails = 유의종목 필드과 같은 상세 정보 노출 여부
+func (o *Upbit) MarketAll(isDetails bool) UpbitMarketAll {
+	params := url.Values{}
+	params.Add("isDetails", strconv.FormatBool(isDetails))
+	var encodedUrl string
+	if len(params) > 0 {
+		encodedUrl = UPBIT_URL_MARKET_ALL + "?" + params.Encode()
+	} else {
+		encodedUrl = UPBIT_URL_MARKET_ALL
+	}
+
+	req, _ := http.NewRequest("GET", encodedUrl, nil)
+	req.Header.Add("Accept", "application/json")
+
+	var res UpbitMarketAll
+
+	httpRes, httpErr := http.DefaultClient.Do(req)
+	if httpErr != nil {
+		res.Common.Error = httpErr
+		return res
+	}
+	body, ioErr := ioutil.ReadAll(httpRes.Body)
+	defer httpRes.Body.Close()
+	if ioErr != nil {
+		res.Common.Error = ioErr
+		return res
+	}
+	content := string(body[:])
+	if httpRes.StatusCode != 200 {
+		var errorBlock UpbitErrorResponse
+		json.Unmarshal([]byte(content), &errorBlock)
+
+		res.Common.StatusCode = httpRes.StatusCode
+		res.Common.Error = errors.New(errorBlock.ErrorBlock.Name + " (" + errorBlock.ErrorBlock.Message + ")")
+		return res
+	}
+	res.Common.StatusCode = httpRes.StatusCode
+
+	var blocks []UpbitMarketAllBlock
+	json.Unmarshal([]byte(content), &blocks)
+
+	if len(blocks) <= 0 {
+		res.Common.Error = errors.New("HTTP STATUS IS 200 BUT RESULT IS EMPTY")
+		return res
+	}
+
 	res.Response = blocks
 	return res
 }
@@ -200,15 +255,33 @@ type UpbitAccounts struct {
 	Common   UpbitCommonBlock
 }
 
+// 마켓 코드 조회 @ market/all
+type UpbitMarketAll struct {
+	Response []UpbitMarketAllBlock
+	Common   UpbitCommonBlock
+}
+
 // 일(Day) 캔들 @ candles/days 결과
 type UpbitCandlesDays struct {
 	Response UpbitCandlesDaysBlock
 	Common   UpbitCommonBlock
 }
 
+// 마켓 코드 조회 @ market/all Block
+type UpbitMarketAllBlock struct {
+	// 업비트에서 제공중인 시장 정보 [String]
+	Market string `json:"market"`
+	// 거래 대상 암호화폐 한글명 [String]
+	KoreanName string `json:"korean_name"`
+	// 거래 대상 암호화폐 영문명 [String]
+	EnglishName string `json:"english_name"`
+	// 	유의 종목 여부 - NONE (해당 사항 없음), CAUTION(투자유의) [String]
+	MarketWarning string `json:"market_warning"`
+}
+
 // 전체 계좌 조회 @ accounts Block
 type UpbitAccountBlock struct {
-	// 화폐를 의미하는 영문 대문자 코드 (string)
+	// 화폐를 의미하는 영문 대문자 코드 [Stirng]
 	Currency string `json:"currency"`
 	// 주문가능 금액/수량 [NumberString]
 	Balance int64 `json:"balance"`

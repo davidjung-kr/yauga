@@ -41,9 +41,18 @@ func TestUpbitAccount(t *testing.T) {
 	upbit := NewUpbit(accessKey)
 	upbit.Payload(secretKey, "")
 	x := upbit.Accounts()
-	t.Log(x.Response[0].Balance)
 	if x.Common.StatusCode != 200 || x.Common.Error != nil || len(x.Response) <= 0 {
 		t.Errorf("TestUpbitAccount | Status:[%d], accountsErr:[%s]", x.Common.StatusCode, x.Common.Error)
+	}
+}
+
+// MarketAll 테스트
+func TestUpbitMarketAll(t *testing.T) {
+	accessKey, _ := getEnvData()
+	upbit := NewUpbit(accessKey)
+	x := upbit.MarketAll(true)
+	if x.Common.StatusCode != 200 || x.Common.Error != nil {
+		t.Errorf("TestUpbitMarketAll | Status:[%d], MarketAllErr:[%s]", x.Common.StatusCode, x.Common.Error)
 	}
 }
 
@@ -52,7 +61,6 @@ func TestUpbitCandlesDays(t *testing.T) {
 	accessKey, _ := getEnvData()
 	upbit := NewUpbit(accessKey)
 	x := upbit.CandlesDays("KRW-BTC", "", 1, "KRW")
-	t.Log(x.Response)
 	if x.Common.StatusCode != 200 || x.Common.Error != nil {
 		t.Errorf("TestUpbitCandlesDays | Status:[%d], candlesDaysErr:[%s]", x.Common.StatusCode, x.Common.Error)
 	}
