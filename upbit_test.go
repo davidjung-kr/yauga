@@ -13,7 +13,7 @@ import (
 
 // 환경변수 상에서 엑세스 데이터 취득
 func getEnvData() (string, string) {
-	return os.Getenv("OMNIC_ACCESS_KEY"), os.Getenv("OMNIC_SECRECT_KEY")
+	return os.Getenv("YAUGA_ACCESS_KEY"), os.Getenv("YAUGA_SECRECT_KEY")
 }
 
 // 생성자 테스트
@@ -21,10 +21,10 @@ func TestUpbitNew(t *testing.T) {
 	accessKey, secretKey := getEnvData()
 
 	if accessKey == "" {
-		t.Errorf("OMNIC_ACCESS_KEY 키 비어있음")
+		t.Errorf("Please set a `YAUGA_ACCESS_KEY`.")
 	}
 	if len(secretKey) == 0 {
-		t.Errorf("OMNIC_SECRECT_KEY 키 비어있음")
+		t.Errorf("Please set a `YAUGA_SECRECT_KEY`.")
 	}
 
 	upbit := NewUpbit(accessKey)
