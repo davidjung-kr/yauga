@@ -56,6 +56,16 @@ func TestUpbitMarketAll(t *testing.T) {
 	}
 }
 
+// CandlesMinutes 테스트
+func TestUpbitCandlesMinutes(t *testing.T) {
+	accessKey, _ := getEnvData()
+	upbit := NewUpbit(accessKey)
+	x := upbit.CandlesMinutes(1, "KRW-BTC", "", 1)
+	if x.Common.StatusCode != 200 || x.Common.Error != nil {
+		t.Errorf("TestUpbitCandlesMinutes | Status:[%d], candlesMinutesErr:[%s]", x.Common.StatusCode, x.Common.Error)
+	}
+}
+
 // CandlesDays 테스트
 func TestUpbitCandlesDays(t *testing.T) {
 	accessKey, _ := getEnvData()

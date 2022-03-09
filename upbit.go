@@ -9,6 +9,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -21,10 +22,13 @@ import (
 const (
 	// [Exchange API] 전체 계좌 조회(Full account inquiry)
 	UPBIT_URL_ACCOUNTS = "https://api.upbit.com/v1/accounts"
-	// [Quotation API] 일(Day) 캔들(Days candles inquiry)
-	UPBIT_URL_CANDLES_DAYS = "https://api.upbit.com/v1/candles/days"
+
 	// [Quotation API] 마켓 코드 조회(Market code inquiry)
 	UPBIT_URL_MARKET_ALL = "https://api.upbit.com/v1/market/all"
+	// [Quotation API] 분(Minute) 캔들(Minutes candles inquiry)
+	UPBIT_URL_CANDLES_MINUTES = "https://api.upbit.com/v1/candles/minutes/%d"
+	// [Quotation API] 일(Day) 캔들(Days candles inquiry)
+	UPBIT_URL_CANDLES_DAYS = "https://api.upbit.com/v1/candles/days"
 )
 
 type Upbit struct {
@@ -149,6 +153,88 @@ func (o *Upbit) MarketAll(isDetails bool) UpbitMarketAll {
 	return res
 }
 
+// [Quotation API] 분(Minute) 캔들 @ candles/minutes/
+// Params:
+// 	unit = 분 단위. 가능한 값 : 1, 3, 5, 15, 10, 30, 60, 240
+//	market = 마켓 코드 (ex. KRW-BTC)
+//	to = 마지막 캔들 시각 (exclusive). 포맷 : yyyy-MM-dd'T'HH:mm:ss'Z' or yyyy-MM-dd HH:mm:ss. 비워서 요청시 가장 최근 캔들
+//	count = 캔들 개수(최대 200개까지 요청 가능)
+func (o *Upbit) CandlesMinutes(unit int, market string, to string, count int) UpbitCandlesMinutes {
+	var targetUrl string
+	params := url.Values{}
+	switch unit {
+	case 1:
+		fallthrough
+	case 3:
+		fallthrough
+	case 5:
+		fallthrough
+	case 15:
+		fallthrough
+	case 10:
+		fallthrough
+	case 30:
+		fallthrough
+	case 60:
+		fallthrough
+	case 240:
+		targetUrl = fmt.Sprintf(UPBIT_URL_CANDLES_MINUTES, unit)
+	default:
+		panic("unit was wrong!")
+	}
+	if market != "" {
+		params.Add("market", market)
+	}
+	if to != "" {
+		params.Add("to", to)
+	}
+	if count > 0 {
+		if count > 200 {
+			panic("Count field only accept until 200!")
+		}
+		params.Add("count", strconv.Itoa(count))
+	}
+
+	encodedUrl := targetUrl + "?" + params.Encode()
+	req, _ := http.NewRequest("GET", encodedUrl, nil)
+	req.Header.Add("Accept", "application/json")
+
+	var res UpbitCandlesMinutes
+
+	httpRes, httpErr := http.DefaultClient.Do(req)
+	if httpErr != nil {
+		res.Common.Error = httpErr
+		return res
+	}
+	body, ioErr := ioutil.ReadAll(httpRes.Body)
+	defer httpRes.Body.Close()
+	if ioErr != nil {
+		res.Common.Error = ioErr
+		return res
+	}
+	content := string(body[:])
+	if httpRes.StatusCode != 200 {
+		var errorBlock UpbitErrorResponse
+		json.Unmarshal([]byte(content), &errorBlock)
+
+		res.Common.StatusCode = httpRes.StatusCode
+		res.Common.Error = errors.New(errorBlock.ErrorBlock.Name + " (" + errorBlock.ErrorBlock.Message + ")")
+		return res
+	}
+	res.Common.StatusCode = httpRes.StatusCode
+
+	var blocks []UpbitCandlesMinutesBlock
+	json.Unmarshal([]byte(content), &blocks)
+
+	if len(blocks) <= 0 {
+		res.Common.Error = errors.New("HTTP STATUS IS 200 BUT RESULT IS EMPTY")
+		return res
+	}
+
+	res.Response = blocks
+	return res
+}
+
 // [Quotation API] 일(Day) 캔들 @ candles/days
 //  `convertingPriceUnit` 파라미터의 경우, 원화 마켓이 아닌 다른 마켓(ex. BTC, ETH)의 일봉 요청시
 //	종가를 명시된 파라미터 값으로 환산해 `converted_trade_price` 필드에 추가하여 반환합니다.
@@ -261,6 +347,12 @@ type UpbitMarketAll struct {
 	Common   UpbitCommonBlock
 }
 
+// 분(Minute) 캔들 @ candles/minutes 결과
+type UpbitCandlesMinutes struct {
+	Response []UpbitCandlesMinutesBlock
+	Common   UpbitCommonBlock
+}
+
 // 일(Day) 캔들 @ candles/days 결과
 type UpbitCandlesDays struct {
 	Response UpbitCandlesDaysBlock
@@ -293,6 +385,32 @@ type UpbitAccountBlock struct {
 	AvgBuyPriceModified bool `json:"avg_buy_price_modified"`
 	// 평단가 기준 화폐	[String]
 	UnitCurreny string `json:"unit_currency"`
+}
+
+// 분(Minute) 캔들 @ candles/minutes Block
+type UpbitCandlesMinutesBlock struct {
+	// 마켓명 [String]
+	Market string `json:"market"`
+	// 캔들 기준 시각(UTC 기준) [String]
+	CandleDateTimeUtc string `json:"candle_ddate_time_utc"`
+	// 캔들 기준 시각(KST 기준)	[String]
+	CandleDateTimeKst string `json:"candle_date_time_kst"`
+	// 시가	[Double]
+	OpeningPrice float64 `json:"opening_price"`
+	// 고가	[Double]
+	HighPrice float64 `json:"high_price"`
+	// 저가	[Double]
+	LowPrice float64 `json:"low_price"`
+	// 종가	[Double]
+	TradePrice float64 `json:"trade_price"`
+	// 해당 캔들에서 마지막 틱이 저장된 시각 [Long]
+	timestamp int64 `json:"timestamp"`
+	// 누적 거래 금액 [Double]
+	CandleAccTradePrice float64 `json:"candle_acc_trade_price"`
+	// 누적 거래량	[Double]
+	CandleAccTradeVolume float64 `json:"candle_acc_trade_volume"`
+	// 분 단위(유닛) [Integer]
+	Unit int32 `json:"unit"`
 }
 
 // 일(Day) 캔들 @ candles/days Block
