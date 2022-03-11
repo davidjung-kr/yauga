@@ -23,12 +23,14 @@ const (
 	// [Exchange API] 전체 계좌 조회(Full account inquiry)
 	UPBIT_URL_ACCOUNTS = "https://api.upbit.com/v1/accounts"
 
-	// [Quotation API] 마켓 코드 조회(Market code inquiry)
+	// [Quotation API] 마켓 코드 조회 (Market code inquiry)
 	UPBIT_URL_MARKET_ALL = "https://api.upbit.com/v1/market/all"
-	// [Quotation API] 분(Minute) 캔들(Minutes candles inquiry)
+	// [Quotation API] 분(Minute) 캔들 (Minutes candles inquiry)
 	UPBIT_URL_CANDLES_MINUTES = "https://api.upbit.com/v1/candles/minutes/%d"
-	// [Quotation API] 일(Day) 캔들(Days candles inquiry)
+	// [Quotation API] 일(Day) 캔들 (Days candles inquiry)
 	UPBIT_URL_CANDLES_DAYS = "https://api.upbit.com/v1/candles/days"
+	// [Quotation API] 주(Week) 캔들 (Weeks candles inquiry)
+	UPBIT_URL_CANDLES_WEEKS = "https://api.upbit.com/v1/candles/weeks"
 )
 
 type Upbit struct {
@@ -39,6 +41,17 @@ type Upbit struct {
 func NewUpbit(AccessKey string) *Upbit {
 	return &Upbit{AccessKey: AccessKey}
 }
+
+/*type NewUpbitRequest struct {
+	// 발급 받은 acccess key (필수)
+	AccessKey string `json:"access_key"`
+	// 무작위의 UUID 문자열 (필수)
+	Nonce string `json:"nonce"`
+	// 해싱된 query string (파라미터가 있을 경우 필수)
+	QueryHash string `json:"query_hash"`
+	// query_hash를 생성하는 데에 사용한 알고리즘 (기본값 : SHA512)
+	QueryHashAlg string `json:"query_hash_alg"`
+}*/
 
 // 인증 가능한 요청 만들기
 //  서명 방식은 HS256 을 권장하며, 서명에 사용할 secret은 발급받은 secret key를 사용합니다.
@@ -305,16 +318,68 @@ func (o *Upbit) CandlesDays(market string, to string, count int, convertingPrice
 	return res
 }
 
-/*type NewUpbitRequest struct {
-	// 발급 받은 acccess key (필수)
-	AccessKey string `json:"access_key"`
-	// 무작위의 UUID 문자열 (필수)
-	Nonce string `json:"nonce"`
-	// 해싱된 query string (파라미터가 있을 경우 필수)
-	QueryHash string `json:"query_hash"`
-	// query_hash를 생성하는 데에 사용한 알고리즘 (기본값 : SHA512)
-	QueryHashAlg string `json:"query_hash_alg"`
-}*/
+// [Quotation API] 주(Week) 캔들 @ candles/weeks
+// Params:
+// 	market = 마켓 코드 (ex. KRW-BTC)
+// 	to = 마지막 캔들 시각 (exclusive). 포맷 : yyyy-MM-dd'T'HH:mm:ss'Z' or yyyy-MM-dd HH:mm:ss. 비워서 요청시 가장 최근 캔들
+//	count = 캔들 개수
+func (o *Upbit) CandlesWeeks(market string, to string, count int, convertingPriceUnit string) UpbitCandlesWeeks {
+	params := url.Values{}
+	if market != "" {
+		params.Add("market", market)
+	}
+	if to != "" {
+		params.Add("to", to)
+	}
+	if count > 0 {
+		params.Add("count", strconv.Itoa(count))
+	}
+
+	var encodedUrl string
+	if len(params) > 0 {
+		encodedUrl = UPBIT_URL_CANDLES_WEEKS + "?" + params.Encode()
+	} else {
+		encodedUrl = UPBIT_URL_CANDLES_WEEKS
+	}
+
+	req, _ := http.NewRequest("GET", encodedUrl, nil)
+	req.Header.Add("Accept", "application/json")
+
+	var res UpbitCandlesWeeks
+
+	httpRes, httpErr := http.DefaultClient.Do(req)
+	if httpErr != nil {
+		res.Common.Error = httpErr
+		return res
+	}
+	body, ioErr := ioutil.ReadAll(httpRes.Body)
+	defer httpRes.Body.Close()
+	if ioErr != nil {
+		res.Common.Error = ioErr
+		return res
+	}
+	content := string(body[:])
+	if httpRes.StatusCode != 200 {
+		var errorBlock UpbitErrorResponse
+		json.Unmarshal([]byte(content), &errorBlock)
+
+		res.Common.StatusCode = httpRes.StatusCode
+		res.Common.Error = errors.New(errorBlock.ErrorBlock.Name + " (" + errorBlock.ErrorBlock.Message + ")")
+		return res
+	}
+	res.Common.StatusCode = httpRes.StatusCode
+
+	var blocks []UpbitCandlesWeeksBlock
+	json.Unmarshal([]byte(content), &blocks)
+
+	if len(blocks) <= 0 {
+		res.Common.Error = errors.New("HTTP STATUS IS 200 BUT RESULT IS EMPTY")
+		return res
+	}
+
+	res.Response = blocks
+	return res
+}
 
 // Error Response
 type UpbitErrorResponse struct {
@@ -356,6 +421,12 @@ type UpbitCandlesMinutes struct {
 // 일(Day) 캔들 @ candles/days 결과
 type UpbitCandlesDays struct {
 	Response UpbitCandlesDaysBlock
+	Common   UpbitCommonBlock
+}
+
+// 주(Week) 캔들 @ candles/weeks 결과
+type UpbitCandlesWeeks struct {
+	Response []UpbitCandlesWeeksBlock
 	Common   UpbitCommonBlock
 }
 
@@ -443,4 +514,30 @@ type UpbitCandlesDaysBlock struct {
 	ChangeRate float64 `json:"change_rate"`
 	// 종가 환산 화폐 단위로 환산된 가격(요청에 convertingPriceUnit 파라미터 없을 시 해당 필드 포함되지 않음.)	[Double]
 	ConvertedTradePrice float64 `json:"converted_trade_price"`
+}
+
+// 주(Week) 캔들 @ candles/weeks Block
+type UpbitCandlesWeeksBlock struct {
+	// 마켓명 [String]
+	Market string `json:"market"`
+	// 캔들 기준 시각(UTC 기준) [String]
+	CandleDateTimeUtc string `json:"candle_ddate_time_utc"`
+	// 캔들 기준 시각(KST 기준)	[String]
+	CandleDateTimeKst string `json:"candle_date_time_kst"`
+	// 시가	[Double]
+	OpeningPrice float64 `json:"opening_price"`
+	// 고가	[Double]
+	HighPrice float64 `json:"high_price"`
+	// 저가	[Double]
+	LowPrice float64 `json:"low_price"`
+	// 종가	[Double]
+	TradePrice float64 `json:"trade_price"`
+	// 마지막 틱이 저장된 시각 [Long]
+	Timestamp int64 `json:"timestamp"`
+	// 누적 거래 금액 [Double]
+	CandleAccTradePrice float64 `json:"candle_acc_trade_price"`
+	// 누적 거래량	[Double]
+	CandleAccTradeVolume float64 `json:"candle_acc_trade_volume"`
+	// 캔들 기간의 가장 첫 날	[String]
+	FirstDayOfPeriod string `json:"first_day_of_period"`
 }

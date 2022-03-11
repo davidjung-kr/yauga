@@ -75,3 +75,13 @@ func TestUpbitCandlesDays(t *testing.T) {
 		t.Errorf("TestUpbitCandlesDays | Status:[%d], candlesDaysErr:[%s]", x.Common.StatusCode, x.Common.Error)
 	}
 }
+
+// CandlesWeeks 테스트
+func TestUpbitCandlesWeeks(t *testing.T) {
+	accessKey, _ := getEnvData()
+	upbit := NewUpbit(accessKey)
+	x := upbit.CandlesWeeks("KRW-BTC", "", 1, "KRW")
+	if x.Common.StatusCode != 200 || x.Common.Error != nil {
+		t.Errorf("TestUpbitCandlesWeeks | Status:[%d], candlesWeeksErr:[%s]", x.Common.StatusCode, x.Common.Error)
+	}
+}
