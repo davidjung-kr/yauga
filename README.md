@@ -52,7 +52,7 @@ Check out `dependencies.sh`.
 * [Upbit API document @ /v1/accounts](https://docs.upbit.com/reference/%EC%A0%84%EC%B2%B4-%EA%B3%84%EC%A2%8C-%EC%A1%B0%ED%9A%8C)
 ```.go
 upbit := NewUpbit(accessKey)
-upbit.Payload(secretKey, "")
+upbit.SetSecretKey(secretKey)
 raw := upbit.Accounts()
 fmt.Print(raw.Response[0].Currency) // Result: KRW (통화코드)
 fmt.Print(raw.Response[0].Balance) // Result: <Numberic> (잔액)
