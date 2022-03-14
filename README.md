@@ -2,9 +2,10 @@
 Yet another Upbit API for golang
 
 # Precautions
-1. I am not responsible for anything done with this.
-2. YOU USE IT AT YOUR OWN RISK.
-3. But, contribution welcomed!
+1. WIP
+2. I am not responsible for anything done with this.
+3. YOU USE IT AT YOUR OWN RISK.
+4. But, contribution welcomed!
 
 # Dependencies
 * [google/uuid](https://github.com/google/uuid)
@@ -14,6 +15,37 @@ Check out `dependencies.sh`.
 
 # Test
 `go test ./` or `go test ./ -v`
+
+# Progress status
+## Exchange API
+* [x] GET @ accounts
+* [ ] GET @ orders/chance
+* [ ] GET @ order
+* [ ] GET @ orders
+* [ ] DELETE @ order
+* [ ] POST @ orders
+* [ ] GET @ withdraws
+* [ ] GET @ withdraw
+* [ ] GET @ withdraws/chance
+* [ ] POST @ withdraws/coin
+* [ ] POST @ withdraws/krw
+* [ ] GET @ deposits
+* [ ] GET @ deposit
+* [ ] POST @ deposits/generate_coin_address
+* [ ] GET @ deposits/coin_addresses
+* [ ] GET @ deposits/coin_address
+* [ ] POST @ deposits/krw
+* [ ] GET @ status/wallet
+* [ ] GET @ api_keys
+### Quotation API
+* [x] GET @ market/all
+* [x] GET @ candles/minutes/{unit}
+* [x] GET @ candles/days
+* [x] GET @ candles/weeks
+* [ ] GET @ candles/months
+* [ ] GET @ trades/ticks
+* [ ] GET @ ticker
+* [ ] GET @ orderbook
 
 # Example
 ## 전체계좌 조회
