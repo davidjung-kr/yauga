@@ -34,7 +34,7 @@ const (
 )
 
 type Upbit struct {
-	AccessKey, Nonce, Token string
+	AccessKey, Nonce, token string
 }
 
 // Initialization
@@ -52,6 +52,11 @@ func NewUpbit(AccessKey string) *Upbit {
 	// query_hash를 생성하는 데에 사용한 알고리즘 (기본값 : SHA512)
 	QueryHashAlg string `json:"query_hash_alg"`
 }*/
+
+// 토큰 취득
+func (o *Upbit) GetToken() string {
+	return o.token
+}
 
 // 인증 가능한 요청 만들기
 //  서명 방식은 HS256 을 권장하며, 서명에 사용할 secret은 발급받은 secret key를 사용합니다.
@@ -73,16 +78,19 @@ func (o *Upbit) Payload(secertKey string, nonce string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	o.Token = "Bearer " + token
-	return o.Token, nil
+	o.token = "Bearer " + token
+	return o.token, nil
 }
 
 // [Exchange API] 전체 계좌 조회 @ accounts
 //  내가 보유한 자산 리스트를 보여줍니다.
 func (o *Upbit) Accounts() UpbitAccounts {
 	req, _ := http.NewRequest("GET", UPBIT_URL_ACCOUNTS, nil)
+	if o.token == "" {
+		panic("Please do payload first.")
+	}
 	req.Header.Add("Accept", "application/json")
-	req.Header.Add("Authorization", o.Token)
+	req.Header.Add("Authorization", o.token)
 
 	var res UpbitAccounts
 
