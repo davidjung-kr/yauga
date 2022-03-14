@@ -23,24 +23,6 @@ func getEnvData() (string, string) {
 	return yaugaAccessKey, yaugaSecrectKey
 }
 
-// 생성자 테스트
-// func TestUpbitNew(t *testing.T) {
-// 	accessKey, secretKey := getEnvData()
-// 	if accessKey == "" {
-// 		t.Errorf("Please set a `YAUGA_ACCESS_KEY`.")
-// 	}
-// 	if len(secretKey) == 0 {
-// 		t.Errorf("Please set a `YAUGA_SECRECT_KEY`.")
-// 	}
-
-// 	upbit := NewUpbit(accessKey)
-
-// 	token, payloadErr := upbit.Payload(secretKey, "")
-// 	if token == "" || payloadErr != nil {
-// 		t.Errorf("TestUpbitNew | token:[%s], payloadErr:[%s]", token, payloadErr)
-// 	}
-// }
-
 // Accounts 테스트
 func TestUpbitAccounts(t *testing.T) {
 	accessKey, secretKey := getEnvData()

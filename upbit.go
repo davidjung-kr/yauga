@@ -24,7 +24,7 @@ const (
 	// [Exchange API] 전체 계좌 조회 (Full account inquiry)
 	UPBIT_URL_ACCOUNTS = "https://api.upbit.com/v1/accounts"
 	// [Exchange API] 주문 가능 정보
-	UPBIT_URL_ORDERS_CHANCE = "https://api.upbit.com/v1/orders/chance?market=%s-%s"
+	UPBIT_URL_ORDERS_CHANCE = "https://api.upbit.com/v1/orders/chance"
 
 	// [Quotation API] 마켓 코드 조회 (Market code inquiry)
 	UPBIT_URL_MARKET_ALL = "https://api.upbit.com/v1/market/all"
@@ -69,7 +69,7 @@ func (o *Upbit) GetToken() string {
 
 type PayloadOption struct {
 	WithParams bool
-	Url        string
+	Params     string
 }
 
 // 인증 가능한 요청 만들기
@@ -81,7 +81,7 @@ func (o *Upbit) payload(opt PayloadOption) (string, error) {
 	claim["nonce"] = uuid.New()
 
 	if opt.WithParams {
-		claim["query_hash"] = fmt.Sprintf("%x", sha512.Sum512([]byte(url.QueryEscape(opt.Url))))
+		claim["query_hash"] = fmt.Sprintf("%x", sha512.Sum512([]byte(opt.Params)))
 		claim["query_hash_alg"] = "SHA512"
 	}
 
@@ -141,8 +141,10 @@ func (o *Upbit) Accounts() UpbitAccounts {
 //	bidCurrencyTicker = 매수 시 사용할 통화
 //	AskCurrencyTicker = 매도 시 사용할 통화
 func (o *Upbit) OrdersChance(bidCurrencyTicker string, AskCurrencyTicker string) UpbitOrdersChance {
-	url := fmt.Sprintf(UPBIT_URL_ORDERS_CHANCE, bidCurrencyTicker, AskCurrencyTicker)
-	o.payload(PayloadOption{WithParams: true, Url: url})
+	params := url.Values{}
+	params.Add("market", fmt.Sprintf("%s-%s", bidCurrencyTicker, AskCurrencyTicker))
+	url := UPBIT_URL_ORDERS_CHANCE + "?" + params.Encode()
+	o.payload(PayloadOption{WithParams: true, Params: params.Encode()})
 	req, _ := http.NewRequest("GET", url, nil)
 	if o.token == "" {
 		panic("Please do `Payload` first.")
