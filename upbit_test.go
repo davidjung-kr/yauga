@@ -13,36 +13,53 @@ import (
 
 // 환경변수 상에서 엑세스 데이터 취득
 func getEnvData() (string, string) {
-	return os.Getenv("YAUGA_ACCESS_KEY"), os.Getenv("YAUGA_SECRECT_KEY")
+	yaugaAccessKey := os.Getenv("YAUGA_ACCESS_KEY")
+	yaugaSecrectKey := os.Getenv("YAUGA_SECRECT_KEY")
+	if yaugaAccessKey == "" {
+		panic("Please set a `YAUGA_ACCESS_KEY`")
+	} else if yaugaSecrectKey == "" {
+		panic("Please set a `YAUGA_SECRECT_KEY`")
+	}
+	return yaugaAccessKey, yaugaSecrectKey
 }
 
 // 생성자 테스트
-func TestUpbitNew(t *testing.T) {
+// func TestUpbitNew(t *testing.T) {
+// 	accessKey, secretKey := getEnvData()
+// 	if accessKey == "" {
+// 		t.Errorf("Please set a `YAUGA_ACCESS_KEY`.")
+// 	}
+// 	if len(secretKey) == 0 {
+// 		t.Errorf("Please set a `YAUGA_SECRECT_KEY`.")
+// 	}
+
+// 	upbit := NewUpbit(accessKey)
+
+// 	token, payloadErr := upbit.Payload(secretKey, "")
+// 	if token == "" || payloadErr != nil {
+// 		t.Errorf("TestUpbitNew | token:[%s], payloadErr:[%s]", token, payloadErr)
+// 	}
+// }
+
+// Accounts 테스트
+func TestUpbitAccounts(t *testing.T) {
 	accessKey, secretKey := getEnvData()
-
-	if accessKey == "" {
-		t.Errorf("Please set a `YAUGA_ACCESS_KEY`.")
-	}
-	if len(secretKey) == 0 {
-		t.Errorf("Please set a `YAUGA_SECRECT_KEY`.")
-	}
-
 	upbit := NewUpbit(accessKey)
-
-	token, payloadErr := upbit.Payload(secretKey, "")
-	if token == "" || payloadErr != nil {
-		t.Errorf("TestUpbitNew | token:[%s], payloadErr:[%s]", token, payloadErr)
+	upbit.SetSecretKey(secretKey)
+	x := upbit.Accounts()
+	if x.Common.StatusCode != 200 || x.Common.Error != nil || len(x.Response) <= 0 {
+		t.Errorf("TestUpbitAccounts | Status:[%d], accountsErr:[%s]", x.Common.StatusCode, x.Common.Error)
 	}
 }
 
-// Account 테스트
-func TestUpbitAccount(t *testing.T) {
+// OrdersChance 테스트
+func TestUpbitOrdersChance(t *testing.T) {
 	accessKey, secretKey := getEnvData()
 	upbit := NewUpbit(accessKey)
-	upbit.Payload(secretKey, "")
-	x := upbit.Accounts()
-	if x.Common.StatusCode != 200 || x.Common.Error != nil || len(x.Response) <= 0 {
-		t.Errorf("TestUpbitAccount | Status:[%d], accountsErr:[%s]", x.Common.StatusCode, x.Common.Error)
+	upbit.SetSecretKey(secretKey)
+	x := upbit.OrdersChance("KRW", "BTC")
+	if x.Common.StatusCode != 200 || x.Common.Error != nil {
+		t.Errorf("TestUpbitOrdersChance | Status:[%d], OrdersChanceErr:[%s]", x.Common.StatusCode, x.Common.Error)
 	}
 }
 

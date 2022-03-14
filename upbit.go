@@ -7,6 +7,7 @@ package main
  * I am not responsible for anything done with this. YOU USE IT AT YOUR OWN RISK.
  */
 import (
+	"crypto/sha512"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,8 +21,10 @@ import (
 )
 
 const (
-	// [Exchange API] 전체 계좌 조회(Full account inquiry)
+	// [Exchange API] 전체 계좌 조회 (Full account inquiry)
 	UPBIT_URL_ACCOUNTS = "https://api.upbit.com/v1/accounts"
+	// [Exchange API] 주문 가능 정보
+	UPBIT_URL_ORDERS_CHANCE = "https://api.upbit.com/v1/orders/chance?market=%s-%s"
 
 	// [Quotation API] 마켓 코드 조회 (Market code inquiry)
 	UPBIT_URL_MARKET_ALL = "https://api.upbit.com/v1/market/all"
@@ -34,12 +37,13 @@ const (
 )
 
 type Upbit struct {
-	AccessKey, Nonce, token string
+	AccessKey        string
+	token, secretKey string
 }
 
 // Initialization
-func NewUpbit(AccessKey string) *Upbit {
-	return &Upbit{AccessKey: AccessKey}
+func NewUpbit(accessKey string) *Upbit {
+	return &Upbit{AccessKey: accessKey}
 }
 
 /*type NewUpbitRequest struct {
@@ -53,28 +57,37 @@ func NewUpbit(AccessKey string) *Upbit {
 	QueryHashAlg string `json:"query_hash_alg"`
 }*/
 
+// 시크릿키 세팅
+func (o *Upbit) SetSecretKey(secretKey string) {
+	o.secretKey = secretKey
+}
+
 // 토큰 취득
 func (o *Upbit) GetToken() string {
 	return o.token
 }
 
+type PayloadOption struct {
+	WithParams bool
+	Url        string
+}
+
 // 인증 가능한 요청 만들기
 //  서명 방식은 HS256 을 권장하며, 서명에 사용할 secret은 발급받은 secret key를 사용합니다.
 //  페이로드의 구성은 다음과 같습니다.
-// Params:
-//	secertKey = That issued by the Upbit developer center
-//	nonce = Random uuid string. 따로 지정 안하면 google/uuid에서 생성한 값을 사용함
-func (o *Upbit) Payload(secertKey string, nonce string) (string, error) {
+func (o *Upbit) payload(opt PayloadOption) (string, error) {
 	claim := jwt.MapClaims{}
 	claim["access_key"] = o.AccessKey
-	if nonce == "" {
-		claim["nonce"] = uuid.New()
-	} else {
-		claim["nonce"] = nonce
-	}
-	at := jwt.NewWithClaims(jwt.SigningMethodHS256, claim)
+	claim["nonce"] = uuid.New()
 
-	token, err := at.SignedString([]byte(secertKey))
+	if opt.WithParams {
+		claim["query_hash"] = fmt.Sprintf("%x", sha512.Sum512([]byte(url.QueryEscape(opt.Url))))
+		claim["query_hash_alg"] = "SHA512"
+	}
+
+	at := jwt.NewWithClaims(jwt.SigningMethodHS256, claim)
+	token, err := at.SignedString([]byte(o.secretKey))
+
 	if err != nil {
 		return "", err
 	}
@@ -85,9 +98,10 @@ func (o *Upbit) Payload(secertKey string, nonce string) (string, error) {
 // [Exchange API] 전체 계좌 조회 @ accounts
 //  내가 보유한 자산 리스트를 보여줍니다.
 func (o *Upbit) Accounts() UpbitAccounts {
+	o.payload(PayloadOption{WithParams: false})
 	req, _ := http.NewRequest("GET", UPBIT_URL_ACCOUNTS, nil)
 	if o.token == "" {
-		panic("Please do payload first.")
+		panic("Please do `Payload` first.")
 	}
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Authorization", o.token)
@@ -118,6 +132,50 @@ func (o *Upbit) Accounts() UpbitAccounts {
 	json.Unmarshal([]byte(content), &blocks)
 	res.Common.StatusCode = httpRes.StatusCode
 	res.Response = blocks
+	return res
+}
+
+// [Exchange API] 주문 가능 정보 @ orders/chance
+//  마켓별 주문 가능 정보를 확인한다.
+// Params:
+//	bidCurrencyTicker = 매수 시 사용할 통화
+//	AskCurrencyTicker = 매도 시 사용할 통화
+func (o *Upbit) OrdersChance(bidCurrencyTicker string, AskCurrencyTicker string) UpbitOrdersChance {
+	url := fmt.Sprintf(UPBIT_URL_ORDERS_CHANCE, bidCurrencyTicker, AskCurrencyTicker)
+	o.payload(PayloadOption{WithParams: true, Url: url})
+	req, _ := http.NewRequest("GET", url, nil)
+	if o.token == "" {
+		panic("Please do `Payload` first.")
+	}
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Authorization", o.token)
+
+	var res UpbitOrdersChance
+
+	httpRes, httpErr := http.DefaultClient.Do(req)
+	if httpErr != nil {
+		res.Common.Error = httpErr
+		return res
+	}
+	body, ioErr := ioutil.ReadAll(httpRes.Body)
+	defer httpRes.Body.Close()
+	if ioErr != nil {
+		res.Common.Error = ioErr
+		return res
+	}
+	content := string(body[:])
+	if httpRes.StatusCode != 200 {
+		var errorBlock UpbitErrorResponse
+		json.Unmarshal([]byte(content), &errorBlock)
+
+		res.Common.StatusCode = httpRes.StatusCode
+		res.Common.Error = errors.New(errorBlock.ErrorBlock.Name + " (" + errorBlock.ErrorBlock.Message + ")")
+		return res
+	}
+	var block UpbitOrdersChanceBlock
+	json.Unmarshal([]byte(content), &block)
+	res.Common.StatusCode = httpRes.StatusCode
+	res.Response = block
 	return res
 }
 
@@ -414,6 +472,12 @@ type UpbitAccounts struct {
 	Common   UpbitCommonBlock
 }
 
+// 주문 가능 정보 @ orders/chance 결과
+type UpbitOrdersChance struct {
+	Response UpbitOrdersChanceBlock
+	Common   UpbitCommonBlock
+}
+
 // 마켓 코드 조회 @ market/all
 type UpbitMarketAll struct {
 	Response []UpbitMarketAllBlock
@@ -438,18 +502,6 @@ type UpbitCandlesWeeks struct {
 	Common   UpbitCommonBlock
 }
 
-// 마켓 코드 조회 @ market/all Block
-type UpbitMarketAllBlock struct {
-	// 업비트에서 제공중인 시장 정보 [String]
-	Market string `json:"market"`
-	// 거래 대상 암호화폐 한글명 [String]
-	KoreanName string `json:"korean_name"`
-	// 거래 대상 암호화폐 영문명 [String]
-	EnglishName string `json:"english_name"`
-	// 	유의 종목 여부 - NONE (해당 사항 없음), CAUTION(투자유의) [String]
-	MarketWarning string `json:"market_warning"`
-}
-
 // 전체 계좌 조회 @ accounts Block
 type UpbitAccountBlock struct {
 	// 화폐를 의미하는 영문 대문자 코드 [Stirng]
@@ -464,6 +516,75 @@ type UpbitAccountBlock struct {
 	AvgBuyPriceModified bool `json:"avg_buy_price_modified"`
 	// 평단가 기준 화폐	[String]
 	UnitCurreny string `json:"unit_currency"`
+}
+
+// 주문 가능 정보 @ orders/chance Block
+type UpbitOrdersChanceBlock struct {
+	// 매도 수수료 비율 [NumberString]
+	AskFee string `json:"ask_fee"`
+	// 마켓에 대한 정보 [Object]
+	Market MarketBlock `json:"market"`
+	// 매수 시 사용하는 화폐의 계좌 상태 [Object]
+	BidAccount BidAskAccountBlock `json:"bid_account"`
+	// 매도 시 사용하는 화폐의 계좌 상태 [Object]
+	AskAccount BidAskAccountBlock `json:"ask_account"`
+}
+
+type MarketBlock struct {
+	// 마켓의 유일 키 [String]
+	Id string `json:"id"`
+	// 마켓 이름 [String]
+	Name string `json:"name"`
+	// 지원 주문 방식 [Array[String]]
+	OrderTypes []string `json:"order_types"`
+	// 지원 주문 종류	[Array[String]]
+	OrderSides []string `json:"order_sides"`
+	// 매수 시 제약 사항 [Object]
+	Bid BidAskBlock `json:"bid"`
+	// 매도 시 제약 사항 [Object]
+	Ask BidAskBlock `json:"ask"`
+	// 최대 매도/매수 금액 [NumberString]
+	MaxTotal string `json:"max_total"`
+	// 마켓 운영 상태 [String]
+	State string `json:"state"`
+}
+
+// 매수/매도 시 제약사항
+type BidAskBlock struct {
+	// 화폐를 의미하는 영문 대문자 코드	[String]
+	Currency string `json:"currency"`
+	// 주문금액 단위 [String]
+	PriceUnit string `json:"price_unit"`
+	// 최소 매도/매수 금액 [Number]
+	MinTotal int32 `json:"min_total"`
+}
+
+// 매수/매도 시 사용하는 화폐의 계좌 상태
+type BidAskAccountBlock struct {
+	// 화폐를 의미하는 영문 대문자 코드	[String]
+	Currency string `json:"currency"`
+	// 주문가능 금액/수량 [NumberString]
+	Balance string `json:"balance"`
+	// 주문 중 묶여있는 금액/수량 [NumberString]
+	Locked string `json:"locked"`
+	// 매수평균가 [NumberString]
+	AvgBuyPrice string `json:"avg_buy_price"`
+	// 매수평균가 수정 여부 [Boolean]
+	AvgBuyPriceModified bool `json:"avg_buy_price_modified"`
+	// 평단가 기준 화폐 [String]
+	UnitCurrency string `json:"unit_currency"`
+}
+
+// 마켓 코드 조회 @ market/all Block
+type UpbitMarketAllBlock struct {
+	// 업비트에서 제공중인 시장 정보 [String]
+	Market string `json:"market"`
+	// 거래 대상 암호화폐 한글명 [String]
+	KoreanName string `json:"korean_name"`
+	// 거래 대상 암호화폐 영문명 [String]
+	EnglishName string `json:"english_name"`
+	// 	유의 종목 여부 - NONE (해당 사항 없음), CAUTION(투자유의) [String]
+	MarketWarning string `json:"market_warning"`
 }
 
 // 분(Minute) 캔들 @ candles/minutes Block
