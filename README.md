@@ -19,7 +19,7 @@ Check out `dependencies.sh`.
 # Progress status
 ## Exchange API
 * [x] GET @ accounts
-* [ ] GET @ orders/chance
+* [x] GET @ orders/chance
 * [ ] GET @ order
 * [ ] GET @ orders
 * [ ] DELETE @ order
