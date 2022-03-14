@@ -475,7 +475,7 @@ type UpbitCandlesMinutesBlock struct {
 	// 종가	[Double]
 	TradePrice float64 `json:"trade_price"`
 	// 해당 캔들에서 마지막 틱이 저장된 시각 [Long]
-	timestamp int64 `json:"timestamp"`
+	Timestamp int64 `json:"timestamp"`
 	// 누적 거래 금액 [Double]
 	CandleAccTradePrice float64 `json:"candle_acc_trade_price"`
 	// 누적 거래량	[Double]
