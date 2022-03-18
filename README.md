@@ -20,7 +20,7 @@ Check out `dependencies.sh`.
 ## Exchange API
 * [x] GET @ accounts
 * [x] GET @ orders/chance
-* [ ] GET @ order
+* [x] GET @ order
 * [ ] GET @ orders
 * [ ] DELETE @ order
 * [ ] POST @ orders
