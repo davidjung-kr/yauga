@@ -45,6 +45,17 @@ func TestUpbitOrdersChance(t *testing.T) {
 	}
 }
 
+// Order 테스트
+func TestUpbitOrder(t *testing.T) {
+	accessKey, secretKey := getEnvData()
+	upbit := NewUpbit(accessKey)
+	upbit.SetSecretKey(secretKey)
+	x := upbit.Order(OrderOption{Uuid: "TEST"})
+	if x.Common.StatusCode != 404 {
+		t.Errorf("TestUpbitOrder | Status:[%d], OrderErr:[%s]", x.Common.StatusCode, x.Common.Error)
+	}
+}
+
 // MarketAll 테스트
 func TestUpbitMarketAll(t *testing.T) {
 	accessKey, _ := getEnvData()

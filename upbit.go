@@ -25,6 +25,8 @@ const (
 	UPBIT_URL_ACCOUNTS = "https://api.upbit.com/v1/accounts"
 	// [Exchange API] 주문 가능 정보
 	UPBIT_URL_ORDERS_CHANCE = "https://api.upbit.com/v1/orders/chance"
+	// [Exchange API] 개별 주문 조회
+	UPBIT_URL_ORDER = "https://api.upbit.com/v1/order"
 
 	// [Quotation API] 마켓 코드 조회 (Market code inquiry)
 	UPBIT_URL_MARKET_ALL = "https://api.upbit.com/v1/market/all"
@@ -175,6 +177,69 @@ func (o *Upbit) OrdersChance(bidCurrencyTicker string, AskCurrencyTicker string)
 		return res
 	}
 	var block UpbitOrdersChanceBlock
+	json.Unmarshal([]byte(content), &block)
+	res.Common.StatusCode = httpRes.StatusCode
+	res.Response = block
+	return res
+}
+
+// uuid 혹은 identifier 둘 중 하나의 값이 반드시 포함되어야 합니다.
+type OrderOption struct {
+	// 주문 UUID
+	Uuid string
+	// 조회용 사용자 지정 값
+	Identifier string
+}
+
+// [Exchange API] 개별 주문 조회 @ order
+//  주문 UUID 를 통해 개별 주문건을 조회한다.
+//	uuid 혹은 identifier 둘 중 하나의 값이 반드시 포함되어야 합니다.
+// Params:
+//	uuid = 주문 UUID
+//	identifier = 조회용 사용자 지정 값
+func (o *Upbit) Order(opt OrderOption) UpbitOrder {
+	params := url.Values{}
+	if opt.Uuid == "" && opt.Identifier == "" {
+		panic("Please configure Uuid or Identifier!")
+	}
+
+	if opt.Uuid != "" {
+		params.Add("uuid", opt.Uuid)
+	} else if opt.Identifier != "" {
+		params.Add("identifier", opt.Identifier)
+	}
+
+	encodedParams := params.Encode()
+
+	url := UPBIT_URL_ORDER + "?" + encodedParams
+	o.payload(PayloadOption{WithParams: true, Params: encodedParams})
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Authorization", o.token)
+
+	var res UpbitOrder
+
+	httpRes, httpErr := http.DefaultClient.Do(req)
+	if httpErr != nil {
+		res.Common.Error = httpErr
+		return res
+	}
+	body, ioErr := ioutil.ReadAll(httpRes.Body)
+	defer httpRes.Body.Close()
+	if ioErr != nil {
+		res.Common.Error = ioErr
+		return res
+	}
+	content := string(body[:])
+	if httpRes.StatusCode != 200 {
+		var errorBlock UpbitErrorResponse
+		json.Unmarshal([]byte(content), &errorBlock)
+
+		res.Common.StatusCode = httpRes.StatusCode
+		res.Common.Error = errors.New(errorBlock.ErrorBlock.Name + " (" + errorBlock.ErrorBlock.Message + ")")
+		return res
+	}
+	var block UpbitOrderBlock
 	json.Unmarshal([]byte(content), &block)
 	res.Common.StatusCode = httpRes.StatusCode
 	res.Response = block
@@ -480,6 +545,12 @@ type UpbitOrdersChance struct {
 	Common   UpbitCommonBlock
 }
 
+// 개별 주문 조회 @ order 결과
+type UpbitOrder struct {
+	Response UpbitOrderBlock
+	Common   UpbitCommonBlock
+}
+
 // 마켓 코드 조회 @ market/all
 type UpbitMarketAll struct {
 	Response []UpbitMarketAllBlock
@@ -575,6 +646,60 @@ type BidAskAccountBlock struct {
 	AvgBuyPriceModified bool `json:"avg_buy_price_modified"`
 	// 평단가 기준 화폐 [String]
 	UnitCurrency string `json:"unit_currency"`
+}
+
+// 개별 주문 조회 @ order Block
+type UpbitOrderBlock struct {
+	// 주문의 고유 아이디 [String]
+	Uuid string `json:"uuid"`
+	// 주문 종류 [String]
+	Side string `json:"side"`
+	// 주문 방식 [String]
+	OrdType string `json:"ord_type"`
+	// 주문 당시 화폐 가격 [NumberString]
+	Price string `json:"price"`
+	// 주문 상태 [String]
+	State string `json:"state"`
+	// 마켓의 유일키 [String]
+	Market string `json:"market"`
+	// 주문 생성 시간 [DateString]
+	CreatedAt string `json:"created_at"`
+	// 사용자가 입력한 주문 양 [NumberString]
+	Volume string `json:"volume"`
+	// 체결 후 남은 주문 양 [NumberString]
+	RemainingVolume string `json:"remaining_volume"`
+	// 수수료로 예약된 비용 [NumberString]
+	ReservedFee string `json:"reserved_fee"`
+	// 남은 수수료 [NumberString]
+	RemainingFee string `json:"remaining_fee"`
+	// 사용된 수수료 [NumberString]
+	PaidFee string `json:"paid_fee"`
+	// 거래에 사용중인 비용 [NumberString]
+	Locked string `json:"locked"`
+	// 체결된 양 [NumberString]
+	ExecutedVolume string `json:"executed_volume"`
+	// 해당 주문에 걸린 체결 수 [Integer]
+	TradeCount int `json:"trade_count"`
+	// 체결 [Array[Object]]
+	Trades []TradeBlock `json:"trades"`
+}
+
+// 체결 Block [Object]
+type TradeBlock struct {
+	// 마켓의 유일 키 [String]
+	Market string `json:"market"`
+	// 체결의 고유 아이디 [String]
+	Uuid string `json:"uuid"`
+	// 체결 가격 [NumberString]
+	Price string `json:"price"`
+	// 체결 양 [NumberString]
+	Volume string `json:"volume"`
+	// 체결된 총 가격 [NumberString]
+	Funds string `json:"funds"`
+	// 체결 종류 [String]
+	Side string `json:"side"`
+	// 체결 시각 [DateString]
+	CreatedAt string `json:"created_at"`
 }
 
 // 마켓 코드 조회 @ market/all Block
